@@ -90,12 +90,12 @@ module Tolk
     end
 
     def phrases_without_translation(page = nil, options = {})
-      phrases = Tolk::Phrase.scoped(:order => 'tolk_phrases.key ASC')
+      phrases = Tolk::Phrase.scoped.order('tolk_phrases.key ASC')
 
       existing_ids = self.translations.all(:select => 'tolk_translations.phrase_id').map(&:phrase_id).uniq
       phrases = phrases.scoped(:conditions => ['tolk_phrases.id NOT IN (?)', existing_ids]) if existing_ids.present?
 
-      result = phrases.paginate({:page => page, :per_page => Phrase.per_page}.merge(options))
+      result = phrases.page(page)
       ActiveRecord::Associations::Preloader.new result, :translations
       result
     end
@@ -114,7 +114,7 @@ module Tolk
       phrases = phrases.containing_text(key_query)
 
       phrases = phrases.scoped(:conditions => ['tolk_phrases.id IN(?)', translations.map(&:phrase_id).uniq])
-      phrases.paginate({:page => page}.merge(options))
+      phrases.page(page)
     end
 
     def search_phrases_without_translation(query, page = nil, options = {})
@@ -126,7 +126,7 @@ module Tolk
       existing_ids = self.translations.all(:select => 'tolk_translations.phrase_id').map(&:phrase_id).uniq
       phrases = phrases.scoped(:conditions => ['tolk_phrases.id NOT IN (?) AND tolk_phrases.id IN(?)', existing_ids, found_translations_ids]) if existing_ids.present?
 
-      result = phrases.paginate({:page => page}.merge(options))
+      result = phrases.page(page)
       ActiveRecord::Associations::Preloader.new result, :translations
       result
     end
@@ -197,9 +197,7 @@ module Tolk
     end
 
     def find_phrases_with_translations(page, conditions = {})
-      result = Tolk::Phrase.paginate(:page => page,
-        :conditions => { :'tolk_translations.locale_id' => self.id }.merge(conditions),
-        :joins => :translations, :order => 'tolk_phrases.key ASC')
+      result = Tolk::Phrase.page(page).where(:'tolk_translations.locale_id' => self.id).joins(:translations).order('tolk_phrases.key ASC')
 
       result.each do |phrase|
         phrase.translation = phrase.translations.for(self)
